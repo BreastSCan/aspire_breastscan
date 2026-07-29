@@ -5,6 +5,7 @@
   - [Requirements/Dependencies](#requirementsdependencies)
   - [How to deploy it](#how-to-deploy-it)
   - [How to use the application](#how-to-use-the-application)
+- [Release Notes](#release-notes)
 - [Authoring](#authoring)
 - [How to contribute](#how-to-contribute)
 - [Links of interest to manage R and Python dependencies for the analyses](#links-of-interest-to-manage-r-and-python-dependencies-for-the-analyses)
@@ -52,6 +53,14 @@ The application allows you to view and execute the data analysis projects that y
 3. __RUN ANALYSIS__: Select project from which you want to run analysis. Next select, from list of scripts found, main script of your analysis, in case of having dependent files among them. Finish by clicking on `RUN ANALYSIS` button and check that everything has been executed correctly.
 4. __OUTPUTS__: In this section you will be able to see  and download, for all projects loaded in application, different output files for every process executed within ASPIRE tool, such as logs, html reports, csv aggregated outputs, etc.
 
+
+# Release notes
+- Version 0.0.2 (28/07/2026)
+  - Forced DuckDB version to 1.5.4
+  - included Psycopg2 library
+  - Migrate.py includes the management of DB version control
+  - Updated to BreastSCan CDM v.0.0.9
+  
 
 # Authoring
 ASPIRE has been developed by the [Data Science for Health Services and Policy research group](https://cienciadedatosysalud.org/en/us/research-group/)

@@ -1,4 +1,4 @@
--- 1. Tabla Principal (Entidad Paciente)
+-- 1. Main entity - cohort entity
 CREATE TABLE women_ent (
     woman_id VARCHAR(255) PRIMARY KEY,
     birth_date_dt DATE,
@@ -10,9 +10,11 @@ CREATE TABLE women_ent (
     menopause_cd INTEGER,
     menopause_age_nm INTEGER,
     menopause_cause_cd INTEGER,
-    personal_cancer_history_cd INTEGER,
     breast_cancer_familial_atc_cd INTEGER,
     ovarian_cancer_familial_atc_cd INTEGER,
+    personal_cancer_history_cd INTEGER,
+    previous_breast_cancer_left_cd INTEGER,
+    previous_breast_cancer_right_cd INTEGER,
     surgical_atc_left_breast_cd INTEGER,
     surgical_atc_right_breast_cd INTEGER,
     hormonal_contraception_use_bl BOOLEAN,
@@ -36,11 +38,12 @@ CREATE TABLE women_ent (
     genetic_testing_brca1_cd INTEGER,
     genetic_testing_brca2_cd INTEGER,
     genetic_testing_palb2_cd INTEGER,
-    genetic_testing_check2_cd INTEGER,
-    exitus_dt DATE
+    genetic_testing_chek2_cd INTEGER,
+    exitus_dt DATE,
+    ethnicity_cd VARCHAR(20)
 );
 
--- 2. Tabla DICOM Series
+-- 2. DICOM Series
 CREATE TABLE dicom_series_ent (
     woman_id VARCHAR(255),
     study_id VARCHAR(255),
@@ -51,9 +54,10 @@ CREATE TABLE dicom_series_ent (
     image_reason_cd INTEGER,
     healthcare_centre_cd VARCHAR(255),
     manufacturer_id VARCHAR(255),
-    breast_density_cd INTEGER,
+    image_quality_cd INTEGER,
+    breast_density_cd VARCHAR(1),
     birads_cd INTEGER,
-    benign_lesion_cd INTEGER,
+    benign_findings_cd INTEGER,
     malignant_lesion_cd INTEGER,
     lesion_location_cd INTEGER,
     lesion_size_nm DOUBLE PRECISION,
@@ -62,14 +66,14 @@ CREATE TABLE dicom_series_ent (
     lesion_associated_features_cd INTEGER,
     ct_cd INTEGER,
     cn_cd INTEGER,
-    n_lesions_nm INTEGER,
     exploration_result_cd INTEGER,
-    exploration_description_st TEXT, -- Usamos TEXT por si la descripción es larga
+    exploration_description_st TEXT, 
+    breastscan_class_cd INTEGER,    
     PRIMARY KEY (woman_id, study_id, series_id),
     CONSTRAINT fk_dicom_woman FOREIGN KEY (woman_id) REFERENCES women_ent(woman_id) ON DELETE CASCADE
 );
 
--- 3. Tabla Tratamiento Quirúrgico
+-- 3. Surgical treatments
 CREATE TABLE surgical_treatment_ent (
     woman_id VARCHAR(255),
     initial_treatment_cd INTEGER,
@@ -80,11 +84,11 @@ CREATE TABLE surgical_treatment_ent (
     lymphovascular_invasion_bl BOOLEAN,
     number_lymph_nodes_examined_nm INTEGER,
     number_lymph_nodes_positive_nm INTEGER,
-    PRIMARY KEY (woman_id, initial_treatment_date_dt), -- Clave compuesta para permitir múltiples tratamientos en fechas distintas
+    PRIMARY KEY (woman_id, initial_treatment_cd, initial_treatment_date_dt), -- PK to allow multiple treatment in different dates
     CONSTRAINT fk_surgical_woman FOREIGN KEY (woman_id) REFERENCES women_ent(woman_id) ON DELETE CASCADE
 );
 
--- 4. Tabla Muestras Patológicas (Biopsias)
+-- 4. Pathological Specimens (Biopsy)
 CREATE TABLE pathological_specimen_ent (
     woman_id VARCHAR(255),
     biopsy_dt DATE,
@@ -107,7 +111,7 @@ CREATE TABLE pathological_specimen_ent (
     CONSTRAINT fk_pathological_woman FOREIGN KEY (woman_id) REFERENCES women_ent(woman_id) ON DELETE CASCADE
 );
 
--- 5. Tabla Tratamiento Neoadyuvante
+-- 5. Neoadjuvant treatments
 CREATE TABLE neoadjuvant_treatment_ent (
     woman_id VARCHAR(255),
     neoadjuvant_therapy_drug_atc_cd VARCHAR(255),
@@ -119,7 +123,7 @@ CREATE TABLE neoadjuvant_treatment_ent (
     CONSTRAINT fk_neoadjuvant_woman FOREIGN KEY (woman_id) REFERENCES women_ent(woman_id) ON DELETE CASCADE
 );
 
--- 6. Tabla de Seguimiento (Follow-up)
+-- 6. Follow-up
 CREATE TABLE followup_ent (
     woman_id VARCHAR(255),
     neoadjuvant_therapy_response_mp_cd INTEGER,
@@ -134,3 +138,13 @@ CREATE TABLE followup_ent (
     PRIMARY KEY (woman_id, last_followup_contact_dt), -- Clave compuesta usando la fecha de contacto
     CONSTRAINT fk_followup_woman FOREIGN KEY (woman_id) REFERENCES women_ent(woman_id) ON DELETE CASCADE
 );
+
+-- Application params
+CREATE TABLE params (
+	param varchar NULL,
+	intvalue int4 NULL,
+	strvalue varchar NULL,
+	CONSTRAINT params_pk PRIMARY KEY (param)
+);
+
+INSERT INTO params(param, intvalue) values ('version', 9);

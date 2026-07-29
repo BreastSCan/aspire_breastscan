@@ -1,5 +1,5 @@
 services:
-  cdmb_container:
+  aspire:
     build: .
     container_name: aspire
     image: aspire_image
