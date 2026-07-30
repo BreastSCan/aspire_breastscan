@@ -190,7 +190,7 @@ def migrate_tables():
         table_pks = {
             "women_ent": ["woman_id"],
             "dicom_series_ent": ["woman_id", "study_id", "series_id"],
-            "surgical_treatment_ent": ["woman_id", "initial_treatment_date_dt"],
+            "surgical_treatment_ent": ["woman_id", "initial_treatment_cd", "initial_treatment_date_dt"],
             "pathological_specimen_ent": ["woman_id", "biopsy_dt"],
             "neoadjuvant_treatment_ent": ["woman_id", "neoadjuvant_therapy_drug_atc_cd"],
             "followup_ent": ["woman_id", "last_followup_contact_dt"]
