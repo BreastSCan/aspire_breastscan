@@ -1,0 +1,219 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aspire-projects-pvc
+  namespace: aspire-tool
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aspire-app
+  namespace: aspire-tool
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aspire
+  template:
+    metadata:
+      labels:
+        app: aspire
+    spec:
+      initContainers:
+      - name: init-projects-data
+        image: aspire_image:latest
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'cp -rn /home/mambauser/projects/* /mnt/pvc/ || true']
+        volumeMounts:
+        - name: projects-volume
+          mountPath: /mnt/pvc
+      containers:
+      - name: aspire
+        image: aspire_image:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3000
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: aspire-db-secret
+              key: db-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: aspire-db-secret
+              key: db-password
+        - name: POSTGRES_DB
+          value: "breastscan"
+        - name: POSTGRES_HOST
+          value: "db.dataset-service.svc.cluster.local"
+        - name: POSTGRES_PORT
+          value: "5432"
+        volumeMounts:
+        - name: projects-volume
+          mountPath: /home/mambauser/projects
+      volumes:
+      - name: projects-volume
+        persistentVolumeClaim:
+          claimName: aspire-projects-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aspire-service
+  namespace: aspire-tool
+spec:
+  selector:
+    app: aspire
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aspire-ingress
+  namespace: aspire-tool
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/auth-url: "https://$host/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/start?rd=$escaped_request_uri"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: mini-node-iacs.bigan.eu
+    http:
+      paths:
+      - path: /aspire(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: aspire-service
+            port:
+              number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aspire-assets-ingress
+  namespace: aspire-tool
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/auth-url: "https://$host/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/start?rd=$escaped_request_uri"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: mini-node-iacs.bigan.eu
+    http:
+      paths:
+      - path: /_astro
+        pathType: Prefix
+        backend:
+          service:
+            name: aspire-service
+            port:
+              number: 3000
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: aspire-service
+            port:
+              number: 3000
+      - path: /[^/]+\.(png|jpg|jpeg|svg|ico)$
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: aspire-service
+            port:
+              number: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: aspire-tool
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      containers:
+      - name: oauth2-proxy
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+        args:
+        - --provider=keycloak-oidc
+        - --oidc-issuer-url=https://mini-node-iacs.bigan.eu/auth/realms/EUCAIM-NODE
+        - --redirect-url=https://mini-node-iacs.bigan.eu/oauth2/callback
+        - --email-domain=*
+        - --allowed-role=aspire-access
+        - --session-cookie-minimal=true
+        - --cookie-secure=true
+        - --cookie-samesite=lax
+        - --reverse-proxy=true
+        - --upstream=static://202
+        - --http-address=0.0.0.0:4180
+        env:
+        - name: OAUTH2_PROXY_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: aspire-auth-secret
+              key: client-id
+        - name: OAUTH2_PROXY_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: aspire-auth-secret
+              key: client-secret
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: aspire-auth-secret
+              key: cookie-secret
+        ports:
+        - containerPort: 4180
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy-service
+  namespace: aspire-tool
+spec:
+  selector:
+    app: oauth2-proxy
+  ports:
+    - protocol: TCP
+      port: 4180
+      targetPort: 4180
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oauth2-proxy-ingress
+  namespace: aspire-tool
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: mini-node-iacs.bigan.eu
+    http:
+      paths:
+      - path: /oauth2
+        pathType: Prefix
+        backend:
+          service:
+            name: oauth2-proxy-service
+            port:
+              number: 4180

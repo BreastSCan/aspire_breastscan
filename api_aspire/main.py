@@ -552,18 +552,21 @@ def get_results_by_project(project_id: str):
     }
 
 
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0"
+}
+
 @app.get("/api/projects/outputs/{project_id}/preview/{category}/{filename:path}")
 def preview_output_file(project_id: str, category: str, filename: str):
     path = get_project_path_by_uuid(project_id)
     if not path:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # --- LÓGICA DE RUTAS DINÁMICA ---
     if category == "audit":
-        # Los scripts de auditoría están en /src/analysis-scripts/
         base_folder = os.path.join(path, "src", "analysis-scripts")
     else:
-        # Los resultados normales están en /outputs/
         subfolder = ""
         if category == "logs":
             subfolder = "logs"
@@ -573,14 +576,12 @@ def preview_output_file(project_id: str, category: str, filename: str):
 
     file_path = os.path.join(base_folder, filename)
 
-    # Seguridad: Evitar Directory Traversal
     if not os.path.abspath(file_path).startswith(os.path.abspath(base_folder)):
         raise HTTPException(status_code=403, detail="Access denied")
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    # --- DETERMINAR MEDIA TYPE ---
     media_type = "text/plain"
     if filename.lower().endswith(".html"):
         media_type = "text/html"
@@ -589,7 +590,8 @@ def preview_output_file(project_id: str, category: str, filename: str):
     elif filename.lower().endswith((".png", ".jpg", ".jpeg")):
         media_type = "image/png"
 
-    return FileResponse(file_path, media_type=media_type)
+    # Se inyectan las cabeceras anti-caché
+    return FileResponse(file_path, media_type=media_type, headers=NO_CACHE_HEADERS)
 
 @app.get("/api/memoryusage")
 def get_memory_usage():
@@ -1070,7 +1072,7 @@ async def update_project_scripts(project_id: str):
 
 
 
-#@app.get("/api/analysis/{project_id}/{script_name}")
+@app.get("/api/analysis/{project_id}/{script_name}")
 @app.get("/api/analysis/{project_id}/{script_name}")
 async def launch_analysis(project_id: str, script_name: str):
     # 1. Validaciones de Ruta
@@ -1107,7 +1109,7 @@ async def launch_analysis(project_id: str, script_name: str):
     )
 
     # --- TAREA DE FONDO (LOGGER) ---
-    # Esta función corre de forma independiente al ciclo de vida de la petición HTTP
+
     async def logger_worker(proc, l_path, r_path, s_name):
         while True:
             line = await proc.stdout.readline()
@@ -1172,17 +1174,6 @@ def get_analysis_scripts():
         text_files = [file for file in text_files if str(file.split('.')[1]).lower() in ["py", "r", "qmd"]]
         response["scripts"].append({"uuid": uuid, "files": text_files})
     return response
-
-
-"""@app.get("/api/download/{project_id}")
-def download_all(project_id: str):
-    try:
-        path_ = get_project_path_by_uuid(project_id)
-        outputs_files = list(filter(os.path.isfile, glob.glob(os.path.join(path_ + "/outputs/**"), recursive=True)))
-        return zipfiles(outputs_files)
-    except:
-        raise HTTPException(status_code=400, detail=f'Something went wrong trying to download all the files.')"""
-
 
 @app.get("/api/projects/audit-scripts/{project_id}")
 async def list_audit_scripts(project_id: str):
@@ -1253,26 +1244,19 @@ def purge_project_outputs(project_id: str):
 @app.get("/api/projects/outputs/{project_id}/download/{category}/{filename}")
 def download_single(project_id: str, category: str, filename: str):
     path = get_project_path_by_uuid(project_id)
-    # Mapping categories to subfolders
     sub = ""
-    if category == "logs": sub = "logs"
-    elif category == "dqa": sub = "dqa"
+    if category == "logs": 
+        sub = "logs"
+    elif category == "dqa": 
+        sub = "dqa"
     
     file_path = os.path.join(path, "outputs", sub, filename)
-    return FileResponse(file_path, filename=filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
 
+    # Se inyectan las cabeceras anti-caché y se fuerza la descarga
+    return FileResponse(file_path, filename=filename, headers=NO_CACHE_HEADERS)
 
-"""@app.get("/api/download/{project_id}/{filename}")
-def download_file(project_id: str, filename: str):
-    path_ = get_project_path_by_uuid(project_id)
-    if '.log' in filename:
-        file_path = os.path.join(path_, "outputs", "logs", filename)
-        if os.path.exists(file_path):
-            return FileResponse(path=file_path, filename=filename)
-    file_path = os.path.join(path_, "outputs", filename)
-    if os.path.exists(file_path):
-        return FileResponse(path=file_path, filename=filename)
-    raise HTTPException(status_code=400, detail=f'Cannot find {filename} file in your project')"""
 
 
 @app.get("/api/datamodel/{project_id}")
